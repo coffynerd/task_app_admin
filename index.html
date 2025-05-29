@@ -15,16 +15,33 @@
     const userSelect = document.getElementById('userSelect');
     const taskForm = document.getElementById('taskForm');
     const userForm = document.getElementById('userForm');
+    const userTable = document.getElementById('userTable');
 
     async function loadUsers() {
       const { data: users, error } = await supabase.from('users').select('*');
       userSelect.innerHTML = '';
+      userTable.innerHTML = '';
       if (error) return console.error(error);
+
       users.forEach(user => {
         const option = document.createElement('option');
         option.value = user.name;
         option.textContent = user.name;
         userSelect.appendChild(option);
+
+        const row = document.createElement('div');
+        row.classList.add('user-row');
+        row.textContent = user.name;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Usuń';
+        deleteBtn.onclick = async () => {
+          await supabase.from('users').delete().eq('id', user.id);
+          loadUsers();
+        };
+
+        row.appendChild(deleteBtn);
+        userTable.appendChild(row);
       });
     }
 
@@ -92,7 +109,7 @@
   </script>
   <style>
     body { font-family: Arial, sans-serif; margin: 30px; }
-    .task { padding: 5px 0; border-bottom: 1px solid #ddd; }
+    .task, .user-row { padding: 5px 0; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
     form { margin-top: 20px; }
     button { margin-left: 10px; }
   </style>
@@ -112,6 +129,9 @@
     <input type="text" id="userInput" placeholder="Imię" required>
     <button type="submit">Dodaj</button>
   </form>
+
+  <h3>Lista pracowników</h3>
+  <div id="userTable">Ładowanie...</div>
 
   <h3>Lista zadań</h3>
   <div id="taskList">Ładowanie...</div>
