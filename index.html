@@ -13,44 +13,10 @@
 
     const taskList = document.getElementById('taskList');
     const hiddenTaskList = document.getElementById('hiddenTaskList');
-    const userSelect = document.getElementById('userSelect');
     const taskForm = document.getElementById('taskForm');
-    const userForm = document.getElementById('userForm');
-    const userTable = document.getElementById('userTable');
-
-    async function loadUsers() {
-      const { data: users, error } = await supabase.from('users').select('*');
-      userSelect.innerHTML = '';
-      userTable.innerHTML = '';
-      if (error) return console.error(error);
-
-      users.forEach(user => {
-        const option = document.createElement('option');
-        option.value = user.id;
-        option.textContent = user.name;
-        userSelect.appendChild(option);
-
-        const row = document.createElement('div');
-        row.classList.add('user-row');
-        row.textContent = user.name;
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = 'Usuń';
-        deleteBtn.onclick = async () => {
-          await supabase.from('users').delete().eq('id', user.id);
-          loadUsers();
-        };
-
-        row.appendChild(deleteBtn);
-        userTable.appendChild(row);
-      });
-    }
 
     async function renderTasks() {
       const { data: tasks, error } = await supabase.from('tasks').select('*');
-      const { data: users } = await supabase.from('users').select('*');
-      const userMap = Object.fromEntries(users.map(u => [u.id, u.name]));
-
       taskList.innerHTML = '';
       hiddenTaskList.innerHTML = '';
       if (error) return taskList.textContent = 'Błąd ładowania zadań.';
@@ -59,67 +25,50 @@
         const div = document.createElement('div');
         div.classList.add('task');
 
-        const assigneeNames = (Array.isArray(task.assignees) ? task.assignees : []).map(id => userMap[id] || id);
-
         const label = document.createElement('label');
-        label.textContent = task.content + ' (' + assigneeNames.join(', ') + ')';
+        label.textContent = `${task.content} (Przypisani: ${task.assignees || ''})`;
 
         const editBtn = document.createElement('button');
         editBtn.textContent = 'Edytuj';
         editBtn.onclick = async () => {
           const newContent = prompt('Nowa treść zadania:', task.content);
-          const selectedIds = prompt('Nowe ID pracowników (oddzielone przecinkami):', (task.assignees || []).join(', '));
-          const assignees = selectedIds ? selectedIds.split(',').map(s => s.trim()) : [];
-          if (newContent && assignees.length > 0) await updateTask(task.id, newContent, assignees);
+          const newAssignees = prompt('Nowi przypisani (oddzieleni średnikiem):', task.assignees || '');
+          if (newContent && newAssignees !== null) {
+            await supabase.from('tasks').update({ content: newContent, assignees: newAssignees }).eq('id', task.id);
+            renderTasks();
+          }
         };
 
-        const hideBtn = document.createElement('button');
-        hideBtn.textContent = task.visible === false ? 'Odkryj' : 'Ukryj';
-        hideBtn.onclick = () => toggleVisibility(task.id, task.visible);
+        const toggleBtn = document.createElement('button');
+        toggleBtn.textContent = task.visible === false ? 'Odkryj' : 'Ukryj';
+        toggleBtn.onclick = async () => {
+          await supabase.from('tasks').update({ visible: !task.visible }).eq('id', task.id);
+          renderTasks();
+        };
 
         div.appendChild(label);
         div.appendChild(editBtn);
-        div.appendChild(hideBtn);
+        div.appendChild(toggleBtn);
 
         (task.visible === false ? hiddenTaskList : taskList).appendChild(div);
       });
     }
 
-    async function updateTask(id, newContent, newAssignees) {
-      await supabase.from('tasks').update({ content: newContent, assignees: newAssignees }).eq('id', id);
-      renderTasks();
-    }
-
-    async function toggleVisibility(id, currentState) {
-      await supabase.from('tasks').update({ visible: !currentState }).eq('id', id);
-      renderTasks();
-    }
-
     taskForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const content = document.getElementById('taskInput').value;
-      const assignees = Array.from(userSelect.selectedOptions).map(opt => opt.value);
-      if (!content || assignees.length === 0) return alert('Wypełnij treść i wybierz osoby.');
+      const content = document.getElementById('taskInput').value.trim();
+      const assignees = document.getElementById('assigneeInput').value.trim();
+      if (!content) return alert('Wpisz treść zadania.');
       await supabase.from('tasks').insert([{ content, assignees, done: false, visible: true }]);
       taskForm.reset();
       renderTasks();
     });
 
-    userForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const userName = document.getElementById('userInput').value.trim();
-      if (!userName) return;
-      await supabase.from('users').insert([{ name: userName }]);
-      userForm.reset();
-      loadUsers();
-    });
-
-    loadUsers();
     renderTasks();
   </script>
   <style>
     body { font-family: Arial, sans-serif; margin: 30px; }
-    .task, .user-row { padding: 5px 0; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+    .task { padding: 5px 0; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
     form { margin-top: 20px; }
     button { margin-left: 10px; }
   </style>
@@ -130,18 +79,9 @@
   <form id="taskForm">
     <h3>Dodaj zadanie</h3>
     <input type="text" id="taskInput" placeholder="Treść zadania" required>
-    <select id="userSelect" multiple size="5" required></select>
+    <input type="text" id="assigneeInput" placeholder="Pracownicy (oddzieleni średnikiem)">
     <button type="submit">Dodaj</button>
   </form>
-
-  <form id="userForm">
-    <h3>Dodaj pracownika</h3>
-    <input type="text" id="userInput" placeholder="Imię" required>
-    <button type="submit">Dodaj</button>
-  </form>
-
-  <h3>Lista pracowników</h3>
-  <div id="userTable">Ładowanie...</div>
 
   <h3>Lista zadań</h3>
   <div id="taskList">Ładowanie...</div>
