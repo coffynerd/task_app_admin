@@ -26,7 +26,7 @@
 
       users.forEach(user => {
         const option = document.createElement('option');
-        option.value = user.name;
+        option.value = user.id;
         option.textContent = user.name;
         userSelect.appendChild(option);
 
@@ -48,6 +48,9 @@
 
     async function renderTasks() {
       const { data: tasks, error } = await supabase.from('tasks').select('*');
+      const { data: users } = await supabase.from('users').select('*');
+      const userMap = Object.fromEntries(users.map(u => [u.id, u.name]));
+
       taskList.innerHTML = '';
       hiddenTaskList.innerHTML = '';
       if (error) return taskList.textContent = 'Błąd ładowania zadań.';
@@ -56,16 +59,18 @@
         const div = document.createElement('div');
         div.classList.add('task');
 
+        const assigneeNames = (Array.isArray(task.assignees) ? task.assignees : []).map(id => userMap[id] || id);
+
         const label = document.createElement('label');
-        label.textContent = task.content + ' (' + (Array.isArray(task.assignees) ? task.assignees.join(', ') : '') + ')';
+        label.textContent = task.content + ' (' + assigneeNames.join(', ') + ')';
 
         const editBtn = document.createElement('button');
         editBtn.textContent = 'Edytuj';
         editBtn.onclick = async () => {
           const newContent = prompt('Nowa treść zadania:', task.content);
-          const assigneeInput = prompt('Nowa lista osób (oddzielone przecinkami):', (task.assignees || []).join(', '));
-          const newAssignees = assigneeInput ? assigneeInput.split(',').map(s => s.trim()) : [];
-          if (newContent && newAssignees.length > 0) await updateTask(task.id, newContent, newAssignees);
+          const selectedIds = prompt('Nowe ID pracowników (oddzielone przecinkami):', (task.assignees || []).join(', '));
+          const assignees = selectedIds ? selectedIds.split(',').map(s => s.trim()) : [];
+          if (newContent && assignees.length > 0) await updateTask(task.id, newContent, assignees);
         };
 
         const hideBtn = document.createElement('button');
