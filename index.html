@@ -12,6 +12,7 @@
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const taskList = document.getElementById('taskList');
+    const hiddenTaskList = document.getElementById('hiddenTaskList');
     const userSelect = document.getElementById('userSelect');
     const taskForm = document.getElementById('taskForm');
     const userForm = document.getElementById('userForm');
@@ -48,6 +49,7 @@
     async function renderTasks() {
       const { data: tasks, error } = await supabase.from('tasks').select('*');
       taskList.innerHTML = '';
+      hiddenTaskList.innerHTML = '';
       if (error) return taskList.textContent = 'Błąd ładowania zadań.';
 
       tasks.forEach(task => {
@@ -55,13 +57,15 @@
         div.classList.add('task');
 
         const label = document.createElement('label');
-        label.textContent = task.content;
+        label.textContent = task.content + ' (' + (Array.isArray(task.assignees) ? task.assignees.join(', ') : '') + ')';
 
         const editBtn = document.createElement('button');
         editBtn.textContent = 'Edytuj';
-        editBtn.onclick = () => {
+        editBtn.onclick = async () => {
           const newContent = prompt('Nowa treść zadania:', task.content);
-          if (newContent) updateTask(task.id, newContent);
+          const assigneeInput = prompt('Nowa lista osób (oddzielone przecinkami):', (task.assignees || []).join(', '));
+          const newAssignees = assigneeInput ? assigneeInput.split(',').map(s => s.trim()) : [];
+          if (newContent && newAssignees.length > 0) await updateTask(task.id, newContent, newAssignees);
         };
 
         const hideBtn = document.createElement('button');
@@ -71,12 +75,13 @@
         div.appendChild(label);
         div.appendChild(editBtn);
         div.appendChild(hideBtn);
-        taskList.appendChild(div);
+
+        (task.visible === false ? hiddenTaskList : taskList).appendChild(div);
       });
     }
 
-    async function updateTask(id, newContent) {
-      await supabase.from('tasks').update({ content: newContent }).eq('id', id);
+    async function updateTask(id, newContent, newAssignees) {
+      await supabase.from('tasks').update({ content: newContent, assignees: newAssignees }).eq('id', id);
       renderTasks();
     }
 
@@ -135,5 +140,8 @@
 
   <h3>Lista zadań</h3>
   <div id="taskList">Ładowanie...</div>
+
+  <h3>Zadania ukryte</h3>
+  <div id="hiddenTaskList"></div>
 </body>
 </html>
