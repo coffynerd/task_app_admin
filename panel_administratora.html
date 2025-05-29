@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Administratora</title>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const supabaseUrl = 'https://ugznhwthaztruazsjbhu.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnem5od3RoYXp0cnVhenNqYmh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg0NjU4NjAsImV4cCI6MjA2NDA0MTg2MH0.MlBkk-oKSRW7CaUiFf3Edo0KXamVlLaZfLuxGcWL4yU';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const taskList = document.getElementById('taskList');
+    const userSelect = document.getElementById('userSelect');
+    const taskForm = document.getElementById('taskForm');
+    const userForm = document.getElementById('userForm');
+
+    async function loadUsers() {
+      const { data: users, error } = await supabase.from('users').select('*');
+      userSelect.innerHTML = '';
+      if (error) return console.error(error);
+      users.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.name;
+        option.textContent = user.name;
+        userSelect.appendChild(option);
+      });
+    }
+
+    async function renderTasks() {
+      const { data: tasks, error } = await supabase.from('tasks').select('*');
+      taskList.innerHTML = '';
+      if (error) return taskList.textContent = 'Błąd ładowania zadań.';
+
+      tasks.forEach(task => {
+        const div = document.createElement('div');
+        div.classList.add('task');
+
+        const label = document.createElement('label');
+        label.textContent = task.content;
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edytuj';
+        editBtn.onclick = () => {
+          const newContent = prompt('Nowa treść zadania:', task.content);
+          if (newContent) updateTask(task.id, newContent);
+        };
+
+        const hideBtn = document.createElement('button');
+        hideBtn.textContent = task.visible === false ? 'Odkryj' : 'Ukryj';
+        hideBtn.onclick = () => toggleVisibility(task.id, task.visible);
+
+        div.appendChild(label);
+        div.appendChild(editBtn);
+        div.appendChild(hideBtn);
+        taskList.appendChild(div);
+      });
+    }
+
+    async function updateTask(id, newContent) {
+      await supabase.from('tasks').update({ content: newContent }).eq('id', id);
+      renderTasks();
+    }
+
+    async function toggleVisibility(id, currentState) {
+      await supabase.from('tasks').update({ visible: !currentState }).eq('id', id);
+      renderTasks();
+    }
+
+    taskForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const content = document.getElementById('taskInput').value;
+      const assignees = Array.from(userSelect.selectedOptions).map(opt => opt.value);
+      if (!content || assignees.length === 0) return alert('Wypełnij treść i wybierz osoby.');
+      await supabase.from('tasks').insert([{ content, assignees, done: false, visible: true }]);
+      taskForm.reset();
+      renderTasks();
+    });
+
+    userForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userName = document.getElementById('userInput').value.trim();
+      if (!userName) return;
+      await supabase.from('users').insert([{ name: userName }]);
+      userForm.reset();
+      loadUsers();
+    });
+
+    loadUsers();
+    renderTasks();
+  </script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; }
+    .task { padding: 5px 0; border-bottom: 1px solid #ddd; }
+    form { margin-top: 20px; }
+    button { margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Panel Administratora</h2>
+
+  <form id="taskForm">
+    <h3>Dodaj zadanie</h3>
+    <input type="text" id="taskInput" placeholder="Treść zadania" required>
+    <select id="userSelect" multiple size="5" required></select>
+    <button type="submit">Dodaj</button>
+  </form>
+
+  <form id="userForm">
+    <h3>Dodaj pracownika</h3>
+    <input type="text" id="userInput" placeholder="Imię" required>
+    <button type="submit">Dodaj</button>
+  </form>
+
+  <h3>Lista zadań</h3>
+  <div id="taskList">Ładowanie...</div>
+</body>
+</html>
