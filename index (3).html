@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <link rel="icon" href="favicon.png" type="image/png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lista Zadań</title>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const supabaseUrl = 'https://ugznhwthaztruazsjbhu.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnem5od3RoYXp0cnVhenNqYmh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg0NjU4NjAsImV4cCI6MjA2NDA0MTg2MH0.MlBkk-oKSRW7CaUiFf3Edo0KXamVlLaZfLuxGcWL4yU';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    async function renderTasks() {
+      const { data: tasks, error } = await supabase.from('tasks').select('*');
+      const taskList = document.getElementById('taskList');
+      taskList.innerHTML = '';
+
+      if (error) {
+        taskList.innerHTML = 'Błąd ładowania zadań.';
+        console.error(error);
+        return;
+      }
+
+      tasks.filter(task => task.visible !== false).forEach(task => {
+        const taskDiv = document.createElement('div');
+        taskDiv.classList.add('task');
+        taskDiv.classList.toggle('done', task.done);
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = task.done;
+
+        checkbox.addEventListener('change', async () => {
+          const { error } = await supabase.from('tasks')
+            .update({ done: checkbox.checked })
+            .eq('id', task.id);
+
+          if (error) {
+            alert('Błąd aktualizacji zadania.');
+            console.error(error);
+            checkbox.checked = !checkbox.checked;
+          } else {
+            taskDiv.classList.toggle('done', checkbox.checked);
+            alert('Zaktualizowano zadanie');
+          }
+        });
+
+        const content = document.createElement('span');
+        content.textContent = ' ' + task.content;
+
+        const assignees = document.createElement('div');
+        assignees.classList.add('assignees');
+        const lista = Array.isArray(task.assignees)
+          ? task.assignees
+          : (typeof task.assignees === 'string' ? task.assignees.split(',').map(s => s.trim()) : []);
+        assignees.textContent = 'Przypisane osoby: ' + lista.join(', ');
+
+        taskDiv.appendChild(checkbox);
+        taskDiv.appendChild(content);
+        taskDiv.appendChild(assignees);
+        taskList.appendChild(taskDiv);
+      });
+    }
+
+    renderTasks();
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+      max-width: 600px;
+    }
+    .task {
+      border-bottom: 1px solid #ddd;
+      padding: 10px 0;
+    }
+    .task.done {
+      color: #888;
+      text-decoration: line-through;
+    }
+    .assignees {
+      color: #555;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <h2>Lista Zadań</h2>
+  <div id="taskList">Ładowanie...</div>
+</body>
+</html>
